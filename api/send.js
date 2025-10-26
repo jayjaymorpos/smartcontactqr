@@ -33,7 +33,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${fromName} <no-reply@YOURDOMAIN.com>`, // CHANGE to a verified sender in Resend
+        from: `${fromName} <onboarding@resend.dev>`, // CHANGE to a verified sender in Resend
         to: [to],
         subject,
         html: `<p>Hi ${name ? name.split(' ')[0] : ''},</p>
