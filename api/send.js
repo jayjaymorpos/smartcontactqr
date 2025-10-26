@@ -1,10 +1,27 @@
-// /api/send.js — Vercel Serverless Function
-// Sends an email with a real attachment via Resend (no 50KB variable limit).
-// REQUIREMENTS:
-//   1) Add RESEND_API_KEY env var in your Vercel project settings
-//   2) Verify a sender/domain in Resend and update the `from` address below
+// /api/send.js
+const ALLOWED_ORIGINS = [
+  'https://smartcontactqr.vercel.app',
+  // add your preview domains if you want to call cross-site:
+  // 'https://smartcontactqr-xxxxx.vercel.app',
+  'http://localhost:3000',
+];
+
+function setCors(req, res) {
+  const origin = req.headers.origin || '';
+  const allow = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  res.setHeader('Access-Control-Allow-Origin', allow);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
 
 export default async function handler(req, res) {
+  setCors(req, res);
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();              // handle preflight
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'POST only' });
     return;
@@ -13,51 +30,35 @@ export default async function handler(req, res) {
   try {
     const { to, name, subject = 'Your Smart Contact Card', fromName = 'Smart Contact', attachmentDataURL } = req.body || {};
     if (!to || !attachmentDataURL) {
-      res.status(400).json({ error: 'Missing \"to\" or \"attachmentDataURL\"" });
+      res.status(400).json({ error: 'Missing "to" or "attachmentDataURL"' });
       return;
     }
 
     const m = /^data:(.+);base64,(.+)$/.exec(attachmentDataURL || '');
-    if (!m) {
-      res.status(400).json({ error: 'Invalid data URL' });
-      return;
-    }
+    if (!m) { res.status(400).json({ error: 'Invalid data URL' }); return; }
     const contentType = m[1];
     const base64 = m[2];
     const ext = contentType.includes('png') ? 'png' : 'jpg';
 
-    const resp = await fetch('https://api.resend.com/emails', {
+    const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${fromName} <onboarding@resend.dev>`, // CHANGE to a verified sender in Resend
+        from: `${fromName} <no-reply@YOURDOMAIN.com>`, // change to your verified sender
         to: [to],
         subject,
-        html: `<p>Hi ${name ? name.split(' ')[0] : ''},</p>
-               <p>Your contact card is attached.</p>
-               <p>— ${fromName}</p>`,
-        attachments: [
-          {
-            filename: `contact-card.${ext}`,
-            content: base64,
-            contentType,
-          },
-        ],
+        html: `<p>Hi ${name ? name.split(' ')[0] : ''},</p><p>Your contact card is attached.</p><p>— ${fromName}</p>`,
+        attachments: [{ filename: `contact-card.${ext}`, content: base64, contentType }],
       }),
     });
 
-    if (!resp.ok) {
-      const txt = await resp.text();
-      res.status(resp.status).json({ error: `Resend error: ${txt}` });
-      return;
-    }
-
-    const data = await resp.json();
+    if (!r.ok) { res.status(r.status).json({ error: await r.text() }); return; }
+    const data = await r.json();
     res.status(200).json({ ok: true, id: data?.id || null });
-  } catch (err) {
-    res.status(500).json({ error: err?.message || String(err) });
+  } catch (e) {
+    res.status(500).json({ error: e?.message || String(e) });
   }
 }
