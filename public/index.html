@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Smart Contact QR Web — Calling Card Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <style>
+    body{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .card-canvas{width:1200px;height:675px;border-radius:18px;overflow:hidden}
+    .card-preview{transform:scale(.38);transform-origin:top left;width:1200px;height:675px}
+    .card-shadow{box-shadow:0 10px 25px rgba(0,0,0,.12)}
+    .badge{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}
+    .step-dot{width:10px;height:10px;border-radius:9999px}
+    .card-text{overflow-wrap:anywhere;word-break:break-word}
+    .qr-hint{font-size:18px;color:#64748b;margin-top:12px;text-align:center}
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50">
+  <header class="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center gap-3">
+      <h1 class="text-xl font-semibold text-slate-800">Smart Contact QR Web — Calling Card Generator</h1>
+      <span class="ml-auto text-xs text-slate-500">3-step workflow • Client-side</span>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 mt-4">
+    <div class="flex items-center gap-3">
+      <div id="step1dot" class="step-dot bg-indigo-600"></div><span class="text-xs">1) Upload CSV</span>
+      <div class="h-px flex-1 bg-slate-200"></div>
+      <div id="step2dot" class="step-dot bg-slate-300"></div><span class="text-xs">2) Generate</span>
+      <div class="h-px flex-1 bg-slate-200"></div>
+      <div id="step3dot" class="step-dot bg-slate-300"></div><span class="text-xs">3) Email</span>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex items-center justify-between mb-4">
+      <button id="backBtn" class="px-3 py-1.5 rounded-lg border border-slate-300 text-sm text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Back</button>
+      <button id="nextBtn" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed">Next</button>
+    </div>
+
+    <section id="page1" class="grid md:grid-cols-2 gap-4">
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 card-shadow">
+        <h2 class="font-semibold mb-2">Upload CSV</h2>
+        <p class="text-sm text-slate-500 mb-3">Headers: <code>name,title,address,email,phone</code></p>
+        <input id="csvInput" type="file" accept=".csv" class="block w-full text-sm file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-700" />
+        <details class="mt-3 text-sm text-slate-600">
+          <summary class="cursor-pointer">Sample CSV</summary>
+<pre class="bg-slate-50 p-2 rounded mt-2 overflow-x-auto text-xs">name,title,address,email,phone
+Juan Dela Cruz,Lecturer,"Tacloban City",juan.dc@example.com,09175551234
+Ana Santos,Admin,"EVSU Ormoc Campus, Ormoc City",ana.santos@example.com,+63 912 345 6789
+</pre>
+        </details>
+      </div>
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 card-shadow">
+        <h3 class="font-semibold mb-2">Status</h3>
+        <ul id="p1Status" class="text-sm text-slate-600 list-disc pl-5">
+          <li>Waiting for CSV upload…</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="page2" class="hidden">
+      <div class="mb-6 grid md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 card-shadow">
+          <h2 class="font-semibold mb-2">Branding</h2>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm mb-1">Primary</label>
+              <input id="colorPrimary" type="color" value="#7a0c0c" class="w-24 h-9 rounded" />
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Accent</label>
+              <input id="colorAccent" type="color" value="#e5b02c" class="w-24 h-9 rounded" />
+            </div>
+          </div>
+          <label class="block text-sm mt-3 mb-1">Upload logo (optional)</label>
+          <input id="logoInput" type="file" accept="image/*" class="block w-full text-sm" />
+          <div class="flex items-center gap-2 mt-3">
+            <input id="showEmail" type="checkbox" class="rounded" checked>
+            <label for="showEmail" class="text-sm">Show email on card</label>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <input id="showAddress" type="checkbox" class="rounded" checked>
+            <label for="showAddress" class="text-sm">Show address on card</label>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 card-shadow">
+          <h2 class="font-semibold mb-2">Export</h2>
+          <button id="downloadAll" class="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Download all (ZIP)</button>
+          <p class="text-xs text-slate-500 mt-2">You can also download each card from the preview grid.</p>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 card-shadow">
+          <h2 class="font-semibold mb-2">Step status</h2>
+          <ul id="p2Status" class="text-sm text-slate-600 list-disc pl-5">
+            <li>Waiting for CSV…</li>
+          </ul>
+        </div>
+      </div>
+
+      <section>
+        <div id="cardsGrid" class="grid gap-6 md:grid-cols-2 lg:grid-cols-2"></div>
+      </section>
+    </section>
+
+    <section id="page3" class="hidden">
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 card-shadow">
+        <h2 class="font-semibold mb-2">Email all generated cards</h2>
+        <div class="grid md:grid-cols-2 gap-3 text-sm">
+          <div>
+            <label class="block text-xs text-slate-500 mb-1">Send API URL</label>
+            <input id="apiUrl" value="/api/send" class="w-full rounded-lg border border-slate-300 px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-500 mb-1">From name (optional)</label>
+            <input id="fromName" placeholder="Smart Contact" class="w-full rounded-lg border border-slate-300 px-3 py-2" />
+          </div>
+        </div>
+        <p class="text-xs text-slate-500 mt-2">Each recipient gets a real <strong>email attachment</strong> (PNG/JPEG) sent by your backend. No template-variable size limits.</p>
+        <div class="mt-3">
+          <button id="emailAllBtn" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+            Send All (via API)
+          </button>
+        </div>
+      </div>
+      <div class="bg-white rounded-2xl p-4 border border-slate-200 card-shadow mt-4">
+        <h3 class="font-semibold mb-2">Send log</h3>
+        <div id="emailLog" class="text-xs whitespace-pre-wrap bg-slate-50 rounded-lg p-3 h-56 overflow-auto">Waiting…</div>
+      </div>
+    </section>
+  </main>
+
+  <template id="cardTemplate">
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 card-shadow">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="font-semibold text-slate-800 text-sm" data-field="displayName"></h3>
+          <p class="text-xs text-slate-500" data-field="displayPhone"></p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="downloadBtn px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-white hover:bg-black">Download PNG</button>
+        </div>
+      </div>
+      <div class="relative overflow-hidden rounded-xl border border-slate-200 card-preview bg-white" data-field="cardRoot"></div>
+    </div>
+  </template>
+
+  <script>
+    const state={step:1, people:[], logoDataURL:null, colorPrimary:'#7a0c0c', colorAccent:'#e5b02c'};
+    const page1=document.getElementById('page1'), page2=document.getElementById('page2'), page3=document.getElementById('page3');
+    const backBtn=document.getElementById('backBtn'), nextBtn=document.getElementById('nextBtn');
+    const p1Status=document.getElementById('p1Status'), p2Status=document.getElementById('p2Status');
+    const stepDots={1:document.getElementById('step1dot'),2:document.getElementById('step2dot'),3:document.getElementById('step3dot')};
+    const csvInput=document.getElementById('csvInput'); const colorPrimary=document.getElementById('colorPrimary'); const colorAccent=document.getElementById('colorAccent');
+    const logoInput=document.getElementById('logoInput'); const showEmail=document.getElementById('showEmail'); const showAddress=document.getElementById('showAddress');
+    const cardsGrid=document.getElementById('cardsGrid'); const downloadAllBtn=document.getElementById('downloadAll');
+    const apiUrl=document.getElementById('apiUrl'); const fromName=document.getElementById('fromName'); const emailAllBtn=document.getElementById('emailAllBtn'); const emailLog=document.getElementById('emailLog');
+
+    function refreshEmailBtn(){ emailAllBtn.disabled=(state.people.length===0)||!apiUrl.value.trim(); }
+    apiUrl.addEventListener('input', refreshEmailBtn);
+
+    function setStep(n){
+      state.step=n; page1.classList.toggle('hidden',n!==1); page2.classList.toggle('hidden',n!==2); page3.classList.toggle('hidden',n!==3);
+      backBtn.disabled=(n===1); nextBtn.textContent=(n===3)?'Finish':'Next'; nextBtn.disabled=(n===1 && state.people.length===0);
+      stepDots[1].className='step-dot '+(n>=1?'bg-indigo-600':'bg-slate-300'); stepDots[2].className='step-dot '+(n>=2?'bg-indigo-600':'bg-slate-300'); stepDots[3].className='step-dot '+(n>=3?'bg-indigo-600':'bg-slate-300');
+      if(n===2){ p2Status.innerHTML= state.people.length?`<li><strong>${state.people.length}</strong> records loaded.</li><li>Adjust branding, then export or click Next.</li>`:`<li>Load CSV in Step 1 first.</li>`; renderCards(); }
+      if(n===3){ refreshEmailBtn(); }
+    }
+    backBtn.onclick=()=>{ if(state.step>1) setStep(state.step-1); };
+    nextBtn.onclick=async()=>{ if(state.step===1){ if(state.people.length===0){ alert('Please upload a CSV first.'); return;} setStep(2); } else if(state.step===2){ try{ await snapshotAllToDataURLs(); }catch(e){} setStep(3);} else { setStep(1);} };
+
+    colorPrimary.addEventListener('input',()=>{ state.colorPrimary=colorPrimary.value; renderCards(); });
+    colorAccent.addEventListener('input',()=>{ state.colorAccent=colorAccent.value; renderCards(); });
+    logoInput.addEventListener('change',(e)=>{ const f=e.target.files&&e.target.files[0]; if(!f){ state.logoDataURL=null; renderCards(); return; } const r=new FileReader(); r.onload=()=>{ state.logoDataURL=r.result; renderCards(); }; r.readAsDataURL(f); });
+
+    csvInput.addEventListener('change',(e)=>{
+      const f=e.target.files&&e.target.files[0]; if(!f) return;
+      Papa.parse(f,{
+        header:true, skipEmptyLines:true,
+        transformHeader:(h)=>(h||'').toString().replace(/^﻿/,'').trim().toLowerCase(),
+        complete:(results)=>{
+          const fields=Array.isArray(results.meta.fields)?results.meta.fields.map(h=>(h||'').toString().replace(/^﻿/,'').trim().toLowerCase()):[];
+          const titleKeys=['title','job title','job_title','position','designation']; const need=['name','address','email','phone'];
+          const missing=need.filter(r=>!fields.includes(r)); if(!fields.some(f=>titleKeys.includes(f))) missing.push('title');
+          if(missing.length){ alert('Missing required headers: '+missing.join(', ')); return; }
+          state.people=(results.data||[]).map((r)=>{ const lower={}; Object.keys(r||{}).forEach(k=>lower[k.toLowerCase()]=r[k]);
+            const pick=(keys)=>{ for(const k of keys){ if(lower[k]) return String(lower[k]); } return ''; };
+            return { name:String(lower['name']||'').trim(), title:String(pick(titleKeys)).trim(), address:String(lower['address']||'').trim(), email:String(lower['email']||'').trim(), phone:String(lower['phone']||'').trim(), pngDataURL:null };
+          }).filter(p=>p.name && p.phone);
+          p1Status.innerHTML= state.people.length?`<li>Loaded <strong>${state.people.length}</strong> records.</li><li>Click Next to brand & generate.</li>`:`<li>No valid rows found.</li>`;
+          nextBtn.disabled=(state.people.length===0);
+        }
+      });
+    });
+
+    function renderCards(){
+      if(state.step!==2) return;
+      cardsGrid.innerHTML=''; downloadAllBtn.disabled=(state.people.length===0);
+      if(state.people.length===0){ const empty=document.createElement('div'); empty.className='text-slate-500 text-sm'; empty.textContent='No records yet. Upload a CSV in Step 1.'; cardsGrid.appendChild(empty); return; }
+      state.people.forEach((person, idx)=>{
+        const tpl=document.getElementById('cardTemplate').content.cloneNode(true);
+        const root=tpl.querySelector('[data-field="cardRoot"]'); root.id='card-'+idx; root.setAttribute('data-card-for', person.name||'');
+        tpl.querySelector('[data-field="displayName"]').textContent=person.name||''; tpl.querySelector('[data-field="displayPhone"]').textContent=person.phone||'';
+        const card=buildCardNode(person); root.appendChild(card);
+        tpl.querySelector('.downloadBtn').addEventListener('click', async ()=>{
+          const canvas=await html2canvas(root,{backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true});
+          canvas.toBlob((blob)=>{ saveAs(blob, (person.name||'card')+'.png'); });
+        });
+        cardsGrid.appendChild(tpl);
+        const qrImg=card.querySelector('img[data-qr-img]'); if(qrImg) makeQRImage(qrImg, makeVCard(person));
+      });
+    }
+
+    function buildCardNode(person){
+      const wrapper=document.createElement('div'); wrapper.className='card-canvas relative bg-white border border-slate-200'; wrapper.setAttribute('data-card-for', person.name||'');
+      const header=document.createElementNS('http://www.w3.org/2000/svg','svg'); header.setAttribute('viewBox','0 0 1200 320'); header.setAttribute('class','block');
+      header.innerHTML=`<rect x="0" y="0" width="1200" height="320" rx="18" fill="${state.colorPrimary}"/>`+
+        `<path d="M0,210 C260,320 700,120 980,200 C1080,230 1150,240 1200,250 L1200,260 L0,260 Z" fill="#ffffff"/>`+
+        `<path d="M0,240 C260,350 700,150 980,230 C1080,260 1150,270 1200,280 L1200,300 L0,300 Z" fill="${state.colorAccent}"/>`; wrapper.appendChild(header);
+
+      if(state.logoDataURL){ const logoWrap=document.createElement('div'); Object.assign(logoWrap.style,{position:'absolute', right:'90px', top:'46px', width:'120px', height:'120px', borderRadius:'9999px', background:'#fff', display:'grid', placeItems:'center', border:'6px solid #fff', boxShadow:'0 6px 14px rgba(0,0,0,.12)'}); const logo=document.createElement('img'); logo.src=state.logoDataURL; logo.alt='Logo'; logo.style.maxWidth='100%'; logo.style.maxHeight='100%'; logo.crossOrigin='anonymous'; logoWrap.appendChild(logo); wrapper.appendChild(logoWrap); }
+
+      const content=document.createElement('div'); Object.assign(content.style,{position:'absolute', left:'60px', right:'60px', top:'300px', bottom:'36px', display:'grid', gridTemplateColumns:'1fr 360px', gap:'24px'});
+      const left=document.createElement('div'); left.className='card-text';
+      const name=(person.name||'').toUpperCase(); const len=name.length; const nameSize=(len<=18)?72:(len<=26?64:(len<=34?56:48));
+      const nameEl=document.createElement('div'); Object.assign(nameEl.style,{fontSize:nameSize+'px', fontWeight:'800', letterSpacing:'1px', color:'#3f3f46', lineHeight:'1.05', marginBottom:'6px'}); nameEl.textContent=name; left.appendChild(nameEl);
+      if(person.title){ const titleEl=document.createElement('div'); Object.assign(titleEl.style,{fontSize:'28px', fontWeight:'700', color:'#6b7280', marginBottom:'16px'}); titleEl.textContent=(person.title||'').toUpperCase(); left.appendChild(titleEl); }
+      const list=document.createElement('div');
+      function detailRow(svgPath, text){ const row=document.createElement('div'); row.className='flex items-center gap-3 mb-4'; const badge=document.createElement('div'); badge.className='badge'; Object.assign(badge.style,{background:state.colorPrimary, color:'#fff', width:'34px', height:'34px', display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:'8px', flex:'0 0 auto'}); badge.innerHTML=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">${svgPath}</svg>`; const t=document.createElement('div'); t.className='text-slate-700 card-text'; Object.assign(t.style,{fontSize:'22px', fontWeight:'600'}); t.textContent=text; row.appendChild(badge); row.appendChild(t); return row; }
+      if(person.phone) list.appendChild(detailRow('<path d="M6.62 10.79a15.053 15.053 0 006.59 6.59l2.2-2.2a1 1 0 011.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 011 1V22a1 1 0 01-1 1C10.85 23 1 13.15 1 1a1 1 0 011-1h4.5a1 1 0 011 1c0 1.25.2 2.46.57 3.58a1 1 0 01-.24 1.01l-2.2 2.2z"/>', person.phone));
+      if(showAddress.checked && person.address) list.appendChild(detailRow('<path d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7zm0 9.5a2.5 2.5 0 110-5 2.5 2.5 0 010 5z"/>', (person.address||'').toUpperCase()));
+      if(showEmail.checked && person.email) list.appendChild(detailRow('<path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>', person.email));
+      left.appendChild(list);
+      const right=document.createElement('div'); right.style.display='grid'; right.style.placeItems='center';
+      const qrImg=document.createElement('img'); qrImg.setAttribute('data-qr-img',''); qrImg.width=320; qrImg.height=320; qrImg.alt='QR'; qrImg.crossOrigin='anonymous'; right.appendChild(qrImg);
+      const hint=document.createElement('div'); hint.className='qr-hint'; hint.textContent='SCAN to save Contact'; right.appendChild(hint);
+      content.appendChild(left); content.appendChild(right); wrapper.appendChild(content);
+      return wrapper;
+    }
+
+    function makeQRImage(imgEl, text){
+      const urls=['https://quickchart.io/qr?text='+encodeURIComponent(text)+'&size=320&ecLevel=M&margin=1','https://api.qrserver.com/v1/create-qr-code/?size=320x320&ecc=M&margin=1&data='+encodeURIComponent(text),'https://chart.googleapis.com/chart?cht=qr&chs=320x320&chld=M|1&chl='+encodeURIComponent(text)];
+      let i=0; function next(){ if(i>=urls.length) return; imgEl.onerror=()=>{ i++; next(); }; imgEl.src=urls[i++]; } next();
+    }
+
+    function splitName(full){ var bits=(full||'').trim().split(/\s+/); return (bits.length===1)?{first:bits[0],last:''}:{first:bits.slice(0,-1).join(' '),last:bits.slice(-1)[0]}; }
+    function normalizePhone(p){ var raw=(p||'').replace(/[^0-9+]/g,''); if(/^0\d{10}$/.test(raw)) return '+63'+raw.slice(1); return raw; }
+    function escapeV(s){ return (''+s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
+    function makeVCard(o){
+      var name=o.name||'', phone=o.phone||'', email=o.email||'', address=o.address||'', title=o.title||''; var CRLF='\r\n', parts=[];
+      parts.push('BEGIN:VCARD'); parts.push('VERSION:3.0'); var n=splitName(name);
+      parts.push('N:'+escapeV(n.last)+';'+escapeV(n.first)+';;;'); parts.push('FN:'+escapeV(name));
+      if(title) parts.push('TITLE:'+escapeV(title)); if(phone) parts.push('TEL;TYPE=CELL,VOICE:'+escapeV(normalizePhone(phone)));
+      if(email) parts.push('EMAIL;TYPE=INTERNET:'+escapeV(email)); if(address) parts.push('ADR;TYPE=WORK:;;'+escapeV(address)+';;;;'); parts.push('END:VCARD'); return parts.join(CRLF);
+    }
+
+    function sanitize(s){ return (s||'').replace(/[^a-z0-9\-_\.]+/gi,'_'); }
+    async function snapshotAllToDataURLs(){
+      const nodes=Array.from(document.querySelectorAll('[data-card-for]'));
+      for(let i=0;i<nodes.length;i++){ try{ const node=nodes[i]; const canvas=await html2canvas(node,{backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true}); state.people[i].pngDataURL=canvas.toDataURL('image/png'); }catch(err){ console.error('Snapshot failed for', state.people[i]?.name, err); state.people[i].pngDataURL=null; } }
+    }
+    downloadAllBtn.addEventListener('click', async ()=>{
+      const zip=new JSZip(); const nodes=Array.from(document.querySelectorAll('[data-card-for]'));
+      for(let i=0;i<nodes.length;i++){ const node=nodes[i]; const name=node.getAttribute('data-card-for')||('card-'+i); const canvas=await html2canvas(node,{backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true}); zip.file((name||'card')+'.png', canvas.toDataURL('image/png').split(',')[1], {base64:true}); }
+      saveAs(await zip.generateAsync({type:'blob'}),'smart-contact-qr-cards.zip');
+    });
+
+    emailAllBtn.addEventListener('click', async ()=>{
+      const API=apiUrl.value.trim(); const SENDER=fromName.value.trim()||'Smart Contact';
+      const people=state.people.filter(p=>p.email); if(people.length===0){ alert('No email addresses in CSV.'); return; }
+      if(!API){ alert('Set your Send API URL.'); return; }
+      emailLog.textContent='Sending...\n';
+      for(const p of people){
+        try{
+          if(!p.pngDataURL){ const node=document.querySelector(`[data-card-for="${CSS.escape(p.name)}"]`); if(node){ const c=await html2canvas(node,{backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true}); p.pngDataURL=c.toDataURL('image/png'); } }
+          const resp=await fetch(API,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ to:p.email, name:p.name, subject:'Your Smart Contact Card', fromName:SENDER, attachmentDataURL:p.pngDataURL }) });
+          if(!resp.ok){ emailLog.textContent+=`✖ Failed for ${p.name} <${p.email}> — ${await resp.text()}\n`; continue; }
+          emailLog.textContent+=`✔ Sent to ${p.name} <${p.email}>\n`;
+        }catch(err){ emailLog.textContent+=`✖ Failed for ${p.name} <${p.email}> — ${err?.message||err}\n`; }
+      }
+      emailLog.textContent+='Done.';
+    });
+
+    showEmail.addEventListener('change', renderCards);
+    showAddress.addEventListener('change', renderCards);
+    window.addEventListener('load', ()=>setStep(1));
+  </script>
+</body>
+</html>
