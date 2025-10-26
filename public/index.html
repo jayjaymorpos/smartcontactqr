@@ -263,9 +263,25 @@ Ana Santos,Admin,"EVSU Ormoc Campus, Ormoc City",ana.santos@example.com,+63 912 
 
     function sanitize(s){ return (s||'').replace(/[^a-z0-9\-_\.]+/gi,'_'); }
     async function snapshotAllToDataURLs(){
-      const nodes=Array.from(document.querySelectorAll('[data-card-for]'));
-      for(let i=0;i<nodes.length;i++){ try{ const node=nodes[i]; const canvas=await html2canvas(node,{backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true}); state.people[i].pngDataURL=canvas.toDataURL('image/png'); }catch(err){ console.error('Snapshot failed for', state.people[i]?.name, err); state.people[i].pngDataURL=null; } }
+  const nodes = Array.from(document.querySelectorAll('[data-card-for]'));
+  // Iterate by people (source of truth), not by nodes length
+  for (let i = 0; i < state.people.length; i++) {
+    const node = nodes[i];
+    if (!node) continue; // guard against mismatch
+    try {
+      const canvas = await html2canvas(node, { backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true });
+      state.people[i].pngDataURL = canvas.toDataURL('image/png');
+    } catch (err) {
+      console.error('Snapshot failed for', state.people[i]?.name, err);
+      state.people[i].pngDataURL = null;
     }
+  }
+}
+
+   // async function snapshotAllToDataURLs(){
+     // const nodes=Array.from(document.querySelectorAll('[data-card-for]'));
+    //  for(let i=0;i<nodes.length;i++){ try{ const node=nodes[i]; const canvas=await html2canvas(node,{backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true}); state.people[i].pngDataURL=canvas.toDataURL('image/png'); }catch(err){ console.error('Snapshot failed for', state.people[i]?.name, err); state.people[i].pngDataURL=null; } }
+   // }
     downloadAllBtn.addEventListener('click', async ()=>{
       const zip=new JSZip(); const nodes=Array.from(document.querySelectorAll('[data-card-for]'));
       for(let i=0;i<nodes.length;i++){ const node=nodes[i]; const name=node.getAttribute('data-card-for')||('card-'+i); const canvas=await html2canvas(node,{backgroundColor:'#ffffff', scale:2, useCORS:true, allowTaint:true}); zip.file((name||'card')+'.png', canvas.toDataURL('image/png').split(',')[1], {base64:true}); }
